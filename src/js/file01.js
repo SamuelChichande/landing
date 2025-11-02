@@ -1,7 +1,13 @@
 "use strict";
 
-import { fetchProducts } from "./functions";
+import { fetchProducts, fetchCategories } from "./functions";
 
+/**
+ * Muestra el toast interactivo si existe en el DOM.
+ *
+ * @description Añade la clase `md:block` al elemento con id "toast-interactive" para mostrarlo.
+ * @returns {void}
+ */
 const showToast = () => {
     const toast = document.getElementById("toast-interactive");
     if (toast) {
@@ -9,6 +15,12 @@ const showToast = () => {
     }
 };
 
+/**
+ * Registra el manejador de click para abrir un vídeo demostrativo en una nueva pestaña.
+ *
+ * @description Agrega un listener al elemento con id "demo" que abre un enlace de YouTube en una nueva ventana.
+ * @returns {void}
+ */
 const showVideo = () => {
     const demo = document.getElementById("demo");
     if (demo) {
@@ -18,6 +30,12 @@ const showVideo = () => {
     }
 };
 
+/**
+ * Obtiene productos remotos y renderiza los primeros 6 en el contenedor `#products-container`.
+ *
+ * @description Usa `fetchProducts` para recuperar los datos. Reemplaza marcadores en una plantilla HTML y lo inserta en el DOM.
+ * @returns {Promise<void>} Promise que se resuelve cuando termina el renderizado o muestra una alerta si ocurre un error.
+ */
 let renderProducts = () => {
     fetchProducts('https://data-dawm.github.io/datum/reseller/products.json')
         .then(result => {
@@ -64,9 +82,50 @@ let renderProducts = () => {
         });
 };
 
+/**
+ * Recupera y renderiza las categorías desde un XML remoto en el elemento `#categories`.
+ *
+ * @description Llama a `fetchCategories` para obtener XML, construye opciones `<option>` y las añade al select.
+ * @returns {Promise<void>} Promise que se resuelve cuando las categorías han sido renderizadas; muestra alert en caso de error.
+ */
+let renderCategories = async () => {
+    try {
+        let result = await fetchCategories('https://data-dawm.github.io/datum/reseller/categories.xml')
+        .then(result => {
+            if (result.success) {
+                let container = document.getElementById("categories");
+                container.innnerHTML = `<option selected disabled>Seleccione una categoría</option>`;
+
+                let categoriesXML = result.body;
+
+                let categories = categoriesXML.getElementsByTagName("category");
+
+                for (let category of categories) {
+                    let categoryHTML = `<option value="[ID]">[NAME]</option>`;
+
+                    let id = category.getElementsByTagName("id")[0].textContent;
+                    let name = category.getElementsByTagName("name")[0].textContent;
+
+
+                    categoryHTML = categoryHTML.replace("[ID]", id);
+                    categoryHTML = categoryHTML.replace("[NAME]", name);
+
+                    container.innerHTML += categoryHTML;
+                    
+                }
+            } else {
+                throw new Error(result.body);
+            }
+        });
+    } catch (error) {
+        alert(result.body);
+    }
+}
+
 (() => {
     showToast();
     showVideo();
     renderProducts();
+    renderCategories();
 })();
 
