@@ -1,6 +1,7 @@
 "use strict";
 
 import { fetchProducts, fetchCategories } from "./functions";
+import { saveVote, getVotes } from "./firebase.js";
 
 /**
  * Muestra el toast interactivo si existe en el DOM.
@@ -74,7 +75,7 @@ let renderProducts = () => {
                     productHTML = productHTML.replaceAll('[PRODUCT.CATEGORY_ID]', product.category_id);
 
                     container.innerHTML += productHTML;
-                    
+
                 });
             } else {
                 alert(result.body);
@@ -91,41 +92,118 @@ let renderProducts = () => {
 let renderCategories = async () => {
     try {
         let result = await fetchCategories('https://data-dawm.github.io/datum/reseller/categories.xml')
-        .then(result => {
-            if (result.success) {
-                let container = document.getElementById("categories");
-                container.innnerHTML = `<option selected disabled>Seleccione una categoría</option>`;
+            .then(result => {
+                if (result.success) {
+                    let container = document.getElementById("categories");
+                    container.innnerHTML = `<option selected disabled>Seleccione una categoría</option>`;
 
-                let categoriesXML = result.body;
+                    let categoriesXML = result.body;
 
-                let categories = categoriesXML.getElementsByTagName("category");
+                    let categories = categoriesXML.getElementsByTagName("category");
 
-                for (let category of categories) {
-                    let categoryHTML = `<option value="[ID]">[NAME]</option>`;
+                    for (let category of categories) {
+                        let categoryHTML = `<option value="[ID]">[NAME]</option>`;
 
-                    let id = category.getElementsByTagName("id")[0].textContent;
-                    let name = category.getElementsByTagName("name")[0].textContent;
+                        let id = category.getElementsByTagName("id")[0].textContent;
+                        let name = category.getElementsByTagName("name")[0].textContent;
 
 
-                    categoryHTML = categoryHTML.replace("[ID]", id);
-                    categoryHTML = categoryHTML.replace("[NAME]", name);
+                        categoryHTML = categoryHTML.replace("[ID]", id);
+                        categoryHTML = categoryHTML.replace("[NAME]", name);
 
-                    container.innerHTML += categoryHTML;
-                    
+                        container.innerHTML += categoryHTML;
+
+                    }
+                } else {
+                    throw new Error(result.body);
                 }
-            } else {
-                throw new Error(result.body);
-            }
-        });
+            });
     } catch (error) {
         alert(result.body);
     }
 }
+
+let enableForm = () => {
+    const form = document.getElementById("form_voting");
+    if (form) {
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+
+            const select = document.getElementById("select_product");
+            const productID = select ? select.value : "";
+
+            saveVote(productID)
+                .then(result => {
+                    if (result && result.status === "success") {
+                        alert("¡Voto guardado exitosamente!");
+                    } else {
+                        alert("Error al guardar el voto: " + (result?.message || "Error desconocido"));
+                    }
+                })
+                .catch(err => {
+                    alert("Error al guardar el voto: " + (err?.message || String(err)));
+                });
+        });
+    }
+
+};
+
+let displayVotes = async () => {
+    const resultsEl = document.getElementById("results");
+    if (!resultsEl) return;
+
+    try {
+        const res = await getVotes();
+
+        if (res.status !== "success") {
+            resultsEl.textContent = res?.message || "No se pudieron obtener los votos.";
+            return;
+        }
+
+        const data = res.data;
+        
+        const counts = {};
+        Object.values(data).forEach(vote => {
+            const pid = vote?.productID ?? "unknown";
+            counts[pid] = (counts[pid] || 0) + 1;
+        });
+
+        const table = document.createElement("table");
+        table.className = "w-full text-sm text-left";
+
+        const thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Producto</th><th>Total votos</th></tr>";
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        for (const [product, total] of Object.entries(counts)) {
+            const tr = document.createElement("tr");
+
+            const tdProduct = document.createElement("td");
+            tdProduct.textContent = product;
+            tr.appendChild(tdProduct);
+
+            const tdTotal = document.createElement("td");
+            tdTotal.textContent = String(total);
+            tr.appendChild(tdTotal);
+
+            tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+
+        resultsEl.innerHTML = "";
+        resultsEl.appendChild(table);
+    } catch (err) {
+        resultsEl.textContent = err?.message || String(err);
+    }
+};
 
 (() => {
     showToast();
     showVideo();
     renderProducts();
     renderCategories();
+    enableForm();
+    displayVotes();
 })();
 
